@@ -76,6 +76,7 @@ jobs:
             --entry-point=trigger_scrape \
             --trigger-http \
             --service-account=${{ secrets.GCP_FUNCTIONS_SA }} \
+            --build-service-account=projects/${{ secrets.GCP_PROJECT_ID }}/serviceAccounts/cloudbuild@${{ secrets.GCP_PROJECT_ID }}.iam.gserviceaccount.com \
             --set-env-vars="GCP_PROJECT=${{ secrets.GCP_PROJECT_ID }},PROPERTY_CITY=London,PROPERTY_COUNTRY=UK,PROPERTY_RADIUS_KM=3,PROPERTY_BEDROOMS=2,PROPERTY_BATHROOMS=1,PROPERTY_MAX_GUESTS=4,SEARCH_LOCATION=London UK" \
             --timeout=540s \
             --memory=512Mi \
@@ -120,6 +121,7 @@ jobs:
             --entry-point=run_analysis \
             --trigger-http \
             --service-account=${{ secrets.GCP_FUNCTIONS_SA }} \
+            --build-service-account=projects/${{ secrets.GCP_PROJECT_ID }}/serviceAccounts/cloudbuild@${{ secrets.GCP_PROJECT_ID }}.iam.gserviceaccount.com \
             --set-env-vars="GCP_PROJECT=${{ secrets.GCP_PROJECT_ID }},PROPERTY_BEDROOMS=2,PROPERTY_BATHROOMS=1,PROPERTY_MAX_GUESTS=4,PROPERTY_TYPE=Entire home,AMENITY_PREMIUM=0" \
             --timeout=540s \
             --memory=512Mi \
