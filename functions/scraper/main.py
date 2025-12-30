@@ -1,6 +1,8 @@
 """
 Cloud Function to scrape competitor pricing data from Airbnb via Apify.
 Triggered daily by Cloud Scheduler.
+
+This function fetches competitor listings and pricing data.
 """
 
 import functions_framework
