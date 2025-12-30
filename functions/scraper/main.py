@@ -136,7 +136,7 @@ def normalize_listing(listing: Dict) -> Dict:
         "rating": listing.get("rating"),
         "review_count": listing.get("reviewsCount"),
         "amenities": listing.get("amenities", []),
-        "host_is_superhost": listing.get("host", {}).get("isSuperhost", False),
+        "host_is_superhost": (listing.get("host") or {}).get("isSuperhost", False),
         "instant_bookable": listing.get("instantBookable", False),
         "first_seen_date": date.today().isoformat(),
         "last_seen_date": date.today().isoformat(),
