@@ -82,10 +82,13 @@ def scrape_airbnb_data(apify_token: str, search_urls: List[str]) -> List[Dict]:
     """Run Apify Airbnb scraper and return results."""
     client = ApifyClient(apify_token)
 
+    # Limit results to control costs - default to 15 per search URL
+    max_listings = int(os.environ.get("MAX_LISTINGS_PER_SEARCH", "15"))
+
     # Using the popular Airbnb scraper
     run_input = {
         "startUrls": [{"url": url} for url in search_urls],
-        "maxListings": 50,  # Limit for MVP
+        "maxListings": max_listings,
         "includeReviews": False,  # Don't need reviews for pricing
         "calendarMonths": 3,  # Get 3 months of calendar data
         "currency": "GBP",
