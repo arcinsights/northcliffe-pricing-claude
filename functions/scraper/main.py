@@ -2,7 +2,7 @@
 Cloud Function to scrape competitor pricing data from Airbnb via Apify.
 Triggered daily by Cloud Scheduler.
 
-This function fetches competitor listings and pricing data.
+Fetches competitor listings and pricing data for analysis.
 """
 
 import functions_framework
@@ -22,7 +22,7 @@ def load_config() -> Dict[str, Any]:
     return {
         "property": {
             "location": {
-                "city": os.getenv("PROPERTY_CITY", "London"),
+                "city": os.getenv("PROPERTY_CITY", "Bradwell"),
                 "country": os.getenv("PROPERTY_COUNTRY", "UK"),
                 "radius_km": int(os.getenv("PROPERTY_RADIUS_KM", "3")),
             },
@@ -33,7 +33,7 @@ def load_config() -> Dict[str, Any]:
             },
         },
         "search_config": {
-            "location": os.getenv("SEARCH_LOCATION", "London, UK"),
+            "location": os.getenv("SEARCH_LOCATION", "Bradwell, UK"),
             "checkin_offset_days": [7, 30, 60],  # Simplified for MVP
             "nights": [3, 7],
             "guests": int(os.getenv("PROPERTY_MAX_GUESTS", "4")),
