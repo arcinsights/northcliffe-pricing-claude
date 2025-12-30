@@ -2,7 +2,7 @@ name: Deploy Cloud Functions
 
 on:
   push:
-    branches: [main]
+    branches: [master, main]
     paths:
       - 'functions/**'
       - '.github/workflows/deploy-functions.yml'
@@ -48,7 +48,7 @@ jobs:
 
   deploy-scraper:
     needs: test
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
     runs-on: ubuntu-latest
     environment: production
 
@@ -92,7 +92,7 @@ jobs:
 
   deploy-analyzer:
     needs: test
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
     runs-on: ubuntu-latest
     environment: production
 

@@ -2,7 +2,7 @@ name: Deploy Dashboard
 
 on:
   push:
-    branches: [main]
+    branches: [master, main]
     paths:
       - 'dashboard/**'
       - '.github/workflows/deploy-dashboard.yml'
