@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+
+{% block title %}Price Calendar - Smart Pricing{% endblock %}
+
+{% block content %}
+<div class="px-4 py-6">
+    <!-- Month Navigation -->
+    <div class="flex justify-between items-center mb-6">
+        <a href="/?year={{ prev_year }}&month={{ prev_month }}"
+           class="px-4 py-2 bg-white border border-gray-300 rounded-md hover:bg-gray-50">
+            &larr; Previous
+        </a>
+        <h2 class="text-2xl font-bold text-gray-900">{{ month_name }} {{ year }}</h2>
+        <a href="/?year={{ next_year }}&month={{ next_month }}"
+           class="px-4 py-2 bg-white border border-gray-300 rounded-md hover:bg-gray-50">
+            Next &rarr;
+        </a>
+    </div>
+
+    <!-- Legend -->
+    <div class="bg-white rounded-lg shadow p-4 mb-6">
+        <h3 class="text-sm font-medium text-gray-700 mb-2">Price Ranges</h3>
+        <div class="flex gap-4 text-sm">
+            <div class="flex items-center gap-2">
+                <div class="w-4 h-4 price-low rounded"></div>
+                <span>Low (&lt;£90)</span>
+            </div>
+            <div class="flex items-center gap-2">
+                <div class="w-4 h-4 price-medium rounded"></div>
+                <span>Standard (£90-110)</span>
+            </div>
+            <div class="flex items-center gap-2">
+                <div class="w-4 h-4 price-high rounded"></div>
+                <span>High (&gt;£110)</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Calendar Grid -->
+    <div class="bg-white rounded-lg shadow overflow-hidden">
+        <div class="grid grid-cols-7 gap-px bg-gray-200">
+            <!-- Weekday headers -->
+            {% for day in ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] %}
+            <div class="bg-gray-50 p-2 text-center text-sm font-medium text-gray-700">
+                {{ day }}
+            </div>
+            {% endfor %}
+
+            <!-- Empty cells before first day -->
+            {% for i in range(first_weekday) %}
+            <div class="bg-white p-4 h-24"></div>
+            {% endfor %}
+
+            <!-- Days of month -->
+            {% for day in range(1, num_days + 1) %}
+            {% set date_str = '%04d-%02d-%02d'|format(year, month, day) %}
+            {% set rec = recommendations.get(date_str) %}
+            {% set is_today = date_str == today %}
+
+            <div class="bg-white p-2 h-24 relative hover:bg-gray-50
+                        {% if is_today %}ring-2 ring-blue-500{% endif %}">
+                <div class="text-sm font-medium text-gray-900 mb-1">{{ day }}</div>
+
+                {% if rec %}
+                <a href="/date/{{ date_str }}" class="block">
+                    <div class="text-lg font-bold
+                                {% if rec.recommended_price < 90 %}text-green-700
+                                {% elif rec.recommended_price > 110 %}text-red-700
+                                {% else %}text-yellow-700{% endif %}">
+                        £{{ rec.recommended_price|int }}
+                    </div>
+                    <div class="text-xs text-gray-500">
+                        {{ rec.comp_set_count }} comps
+                    </div>
+                </a>
+                {% else %}
+                <div class="text-xs text-gray-400">No data</div>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Events Section -->
+    {% if events %}
+    <div class="bg-white rounded-lg shadow p-6 mt-6">
+        <h3 class="text-lg font-semibold text-gray-900 mb-4">Events This Month</h3>
+        <div class="space-y-2">
+            {% for event in events %}
+            <div class="flex items-center gap-3 text-sm">
+                <div class="text-gray-600">{{ event.event_date.strftime('%b %d') }}</div>
+                <div class="font-medium">{{ event.event_name }}</div>
+                <div class="px-2 py-1 rounded text-xs
+                            {% if event.expected_impact == 'high' %}bg-red-100 text-red-800
+                            {% elif event.expected_impact == 'medium' %}bg-yellow-100 text-yellow-800
+                            {% else %}bg-blue-100 text-blue-800{% endif %}">
+                    {{ event.expected_impact }} impact
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

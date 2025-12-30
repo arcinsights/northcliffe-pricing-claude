@@ -1,0 +1,71 @@
+# Copy this to config.yaml and fill in your details
+
+property:
+  name: "My Airbnb Property"
+
+  # Optional: Your actual Airbnb listing ID (if you want to track it)
+  airbnb_id: ""
+
+  location:
+    # Your property location (for finding competitors nearby)
+    city: "London"
+    country: "UK"
+    # Or use coordinates:
+    # lat: 51.5074
+    # lng: -0.1278
+    radius_km: 3  # How far to search for competitors
+
+  attributes:
+    bedrooms: 2
+    bathrooms: 1
+    max_guests: 4
+    property_type: "Entire home"  # "Entire home", "Entire apartment", "Private room", etc.
+
+  amenities:
+    # List your key amenities (used for comp matching)
+    - "Wifi"
+    - "Kitchen"
+    - "Free parking"
+    # - "Pool"
+    # - "Hot tub"
+    # - "Air conditioning"
+    # - "Washer"
+    # - "Heating"
+
+  # If you have amenities competitors don't, estimate your premium
+  amenity_premium: 0  # e.g., 10 means +£10/night vs median comp
+
+search_config:
+  # How to search for competitors
+  platforms:
+    - airbnb
+    # - booking  # Enable in Phase 4
+
+  # Check prices for different future dates
+  checkin_offset_days: [7, 14, 30, 60, 90]
+
+  # Different stay lengths to check
+  nights: [2, 3, 7]
+
+  # Number of guests to search for
+  guests: 4
+
+filters:
+  # Competitor filtering
+  min_bedrooms: 1
+  max_bedrooms: 3
+  min_rating: 4.0  # Only track well-rated competitors
+  max_comp_set_size: 15  # Top N most similar properties
+
+gcp:
+  project_id: ""  # Will fill during setup
+  region: "europe-west2"  # London region
+
+apify:
+  # Get from https://console.apify.com/account/integrations
+  api_token: ""  # Add to GitHub secrets, not here!
+
+alerts:
+  # Optional: Get daily price recommendation emails
+  enabled: false
+  email: ""

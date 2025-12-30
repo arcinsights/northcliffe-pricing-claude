@@ -1,0 +1,197 @@
+name: Deploy Cloud Functions
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'functions/**'
+      - '.github/workflows/deploy-functions.yml'
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        function: [scraper, analyzer]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        working-directory: functions/${{ matrix.function }}
+        run: |
+          pip install -r requirements.txt
+          pip install -r requirements-dev.txt
+
+      - name: Lint with flake8
+        working-directory: functions/${{ matrix.function }}
+        run: |
+          flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+          flake8 . --count --exit-zero --max-complexity=10 --max-line-length=100 --statistics
+        continue-on-error: true
+
+      - name: Format check with black
+        working-directory: functions/${{ matrix.function }}
+        run: black --check .
+        continue-on-error: true
+
+  deploy-scraper:
+    needs: test
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Deploy Scraper Function
+        working-directory: functions/scraper
+        run: |
+          gcloud functions deploy scraper \
+            --gen2 \
+            --runtime=python311 \
+            --region=${{ secrets.GCP_REGION || 'europe-west2' }} \
+            --source=. \
+            --entry-point=trigger_scrape \
+            --trigger-http \
+            --service-account=${{ secrets.GCP_FUNCTIONS_SA }} \
+            --set-env-vars="GCP_PROJECT=${{ secrets.GCP_PROJECT_ID }},PROPERTY_CITY=London,PROPERTY_COUNTRY=UK,PROPERTY_RADIUS_KM=3,PROPERTY_BEDROOMS=2,PROPERTY_BATHROOMS=1,PROPERTY_MAX_GUESTS=4,SEARCH_LOCATION=London UK" \
+            --timeout=540s \
+            --memory=512Mi \
+            --max-instances=10 \
+            --no-allow-unauthenticated
+
+      - name: Output Function URL
+        run: |
+          FUNCTION_URL=$(gcloud functions describe scraper \
+            --region=${{ secrets.GCP_REGION || 'europe-west2' }} \
+            --gen2 \
+            --format='value(serviceConfig.uri)')
+          echo "Scraper Function URL: $FUNCTION_URL"
+
+  deploy-analyzer:
+    needs: test
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Deploy Analyzer Function
+        working-directory: functions/analyzer
+        run: |
+          gcloud functions deploy analyzer \
+            --gen2 \
+            --runtime=python311 \
+            --region=${{ secrets.GCP_REGION || 'europe-west2' }} \
+            --source=. \
+            --entry-point=run_analysis \
+            --trigger-http \
+            --service-account=${{ secrets.GCP_FUNCTIONS_SA }} \
+            --set-env-vars="GCP_PROJECT=${{ secrets.GCP_PROJECT_ID }},PROPERTY_BEDROOMS=2,PROPERTY_BATHROOMS=1,PROPERTY_MAX_GUESTS=4,PROPERTY_TYPE=Entire home,AMENITY_PREMIUM=0" \
+            --timeout=540s \
+            --memory=512Mi \
+            --max-instances=10 \
+            --no-allow-unauthenticated
+
+      - name: Output Function URL
+        run: |
+          FUNCTION_URL=$(gcloud functions describe analyzer \
+            --region=${{ secrets.GCP_REGION || 'europe-west2' }} \
+            --gen2 \
+            --format='value(serviceConfig.uri)')
+          echo "Analyzer Function URL: $FUNCTION_URL"
+
+  setup-scheduler:
+    needs: [deploy-scraper, deploy-analyzer]
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Create/Update Scraper Schedule
+        run: |
+          FUNCTION_URL=$(gcloud functions describe scraper \
+            --region=${{ secrets.GCP_REGION || 'europe-west2' }} \
+            --gen2 \
+            --format='value(serviceConfig.uri)')
+
+          gcloud scheduler jobs create http daily-scrape \
+            --location=${{ secrets.GCP_REGION || 'europe-west2' }} \
+            --schedule="0 6 * * *" \
+            --uri="$FUNCTION_URL" \
+            --http-method=POST \
+            --oidc-service-account-email=${{ secrets.GCP_SCHEDULER_SA }} \
+            --time-zone="Europe/London" \
+            || gcloud scheduler jobs update http daily-scrape \
+            --location=${{ secrets.GCP_REGION || 'europe-west2' }} \
+            --schedule="0 6 * * *" \
+            --uri="$FUNCTION_URL" \
+            --http-method=POST \
+            --oidc-service-account-email=${{ secrets.GCP_SCHEDULER_SA }} \
+            --time-zone="Europe/London"
+
+      - name: Create/Update Analyzer Schedule
+        run: |
+          FUNCTION_URL=$(gcloud functions describe analyzer \
+            --region=${{ secrets.GCP_REGION || 'europe-west2' }} \
+            --gen2 \
+            --format='value(serviceConfig.uri)')
+
+          gcloud scheduler jobs create http daily-analysis \
+            --location=${{ secrets.GCP_REGION || 'europe-west2' }} \
+            --schedule="0 7 * * *" \
+            --uri="$FUNCTION_URL" \
+            --http-method=POST \
+            --oidc-service-account-email=${{ secrets.GCP_SCHEDULER_SA }} \
+            --time-zone="Europe/London" \
+            || gcloud scheduler jobs update http daily-analysis \
+            --location=${{ secrets.GCP_REGION || 'europe-west2' }} \
+            --schedule="0 7 * * *" \
+            --uri="$FUNCTION_URL" \
+            --http-method=POST \
+            --oidc-service-account-email=${{ secrets.GCP_SCHEDULER_SA }} \
+            --time-zone="Europe/London"

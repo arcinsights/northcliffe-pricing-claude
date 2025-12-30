@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+
+{% block title %}No Data Available{% endblock %}
+
+{% block content %}
+<div class="px-4 py-6">
+    <div class="mb-6">
+        <a href="/" class="text-blue-600 hover:text-blue-800">&larr; Back to Calendar</a>
+    </div>
+
+    <div class="bg-white rounded-lg shadow p-12 text-center">
+        <div class="text-6xl mb-4">📊</div>
+        <h2 class="text-2xl font-bold text-gray-900 mb-2">No Data Available</h2>
+        <p class="text-gray-600 mb-6">
+            We don't have pricing recommendations for {{ date }} yet.
+        </p>
+        <p class="text-sm text-gray-500">
+            Data is updated daily. Please check back tomorrow or contact support if this issue persists.
+        </p>
+    </div>
+</div>
+{% endblock %}
