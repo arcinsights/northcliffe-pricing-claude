@@ -1,268 +1,320 @@
 """
-Cloud Function to scrape competitor pricing data from Airbnb via Apify.
-Triggered daily by Cloud Scheduler.
-
-Fetches competitor listings and pricing data for analysis.
+Cloud Function to scrape competitor calendar pricing data from Airbnb via Apify.
+Uses manually-specified competitor listings to get full-year pricing data.
 """
 
 import functions_framework
 import os
 import json
-from datetime import datetime, timedelta, date
+from datetime import datetime, date
 from typing import List, Dict, Any
 from google.cloud import storage, bigquery, secretmanager
 from apify_client import ApifyClient
 import yaml
 
 
-def load_config() -> Dict[str, Any]:
-    """Load configuration from Cloud Storage or environment."""
-    # In production, load from Cloud Storage
-    # For now, using environment variables
-    return {
-        "property": {
-            "location": {
-                "city": os.getenv("PROPERTY_CITY", "Bradwell"),
-                "country": os.getenv("PROPERTY_COUNTRY", "UK"),
-                "radius_km": int(os.getenv("PROPERTY_RADIUS_KM", "3")),
-            },
-            "attributes": {
-                "bedrooms": int(os.getenv("PROPERTY_BEDROOMS", "2")),
-                "bathrooms": float(os.getenv("PROPERTY_BATHROOMS", "1")),
-                "max_guests": int(os.getenv("PROPERTY_MAX_GUESTS", "4")),
-            },
-        },
-        "search_config": {
-            "location": os.getenv("SEARCH_LOCATION", "Bradwell, UK"),
-            "checkin_offset_days": [7, 30, 60],  # Simplified for MVP
-            "nights": [3, 7],
-            "guests": int(os.getenv("PROPERTY_MAX_GUESTS", "4")),
-        },
-        "filters": {
-            "min_bedrooms": 1,
-            "max_bedrooms": 3,
-            "min_rating": 4.0,
-        },
-    }
+def load_competitors_config() -> List[Dict[str, str]]:
+    """Load competitor listings from Cloud Storage config."""
+    try:
+        storage_client = storage.Client()
+        bucket_name = f"{os.getenv('GCP_PROJECT')}-pricing-raw-data"
+        bucket = storage_client.bucket(bucket_name)
+
+        # Try to load from Cloud Storage first
+        blob = bucket.blob("config/competitors.yaml")
+        if blob.exists():
+            config_content = blob.download_as_text()
+            config = yaml.safe_load(config_content)
+            return config.get('competitors', [])
+    except Exception as e:
+        print(f"Could not load competitors from Cloud Storage: {e}")
+
+    # Fallback to empty list - user needs to upload competitors.yaml
+    print("WARNING: No competitors configured. Upload competitors.yaml to Cloud Storage.")
+    return []
 
 
 def get_apify_token() -> str:
     """Retrieve Apify API token from Secret Manager."""
-    project_id = os.getenv("GCP_PROJECT")
-    client = secretmanager.SecretManagerServiceClient()
-    name = f"projects/{project_id}/secrets/apify-api-token/versions/latest"
-    response = client.access_secret_version(request={"name": name})
-    return response.payload.data.decode("UTF-8")
+    try:
+        client = secretmanager.SecretManagerServiceClient()
+        project_id = os.getenv("GCP_PROJECT")
+        name = f"projects/{project_id}/secrets/apify-api-token/versions/latest"
+        response = client.access_secret_version(request={"name": name})
+        return response.payload.data.decode("UTF-8")
+    except Exception as e:
+        print(f"Error retrieving Apify token: {e}")
+        raise
 
 
-def build_airbnb_search_urls(config: Dict) -> List[str]:
-    """Build Airbnb search URLs for different date ranges."""
-    base_location = config["search_config"]["location"]
-    guests = config["search_config"]["guests"]
+def scrape_calendar_data(apify_token: str, competitor_urls: List[str]) -> List[Dict]:
+    """
+    Scrape full-year calendar pricing using Apify calendar scraper.
 
-    urls = []
-    for days_offset in config["search_config"]["checkin_offset_days"]:
-        for nights in config["search_config"]["nights"]:
-            checkin = date.today() + timedelta(days=days_offset)
-            checkout = checkin + timedelta(days=nights)
-
-            # Airbnb search URL format
-            url = (
-                f"https://www.airbnb.com/s/{base_location.replace(' ', '-')}/homes"
-                f"?checkin={checkin.isoformat()}"
-                f"&checkout={checkout.isoformat()}"
-                f"&adults={guests}"
-            )
-            urls.append(url)
-
-    return urls
-
-
-def scrape_airbnb_data(apify_token: str, search_urls: List[str]) -> List[Dict]:
-    """Run Apify Airbnb scraper and return results."""
+    This uses a calendar-focused scraper that provides 365 days of pricing data
+    instead of just search results.
+    """
     client = ApifyClient(apify_token)
 
-    # Limit results to control costs - default to 15 per search URL
-    max_listings = int(os.environ.get("MAX_LISTINGS_PER_SEARCH", "15"))
+    print(f"Starting calendar scrape for {len(competitor_urls)} listings...")
 
-    # Using the popular Airbnb scraper
+    # Try the calendar-focused scraper
+    # simpleapi/airbnb-full-year-price-tracker-scraper expects listing URLs
     run_input = {
-        "startUrls": [{"url": url} for url in search_urls],
-        "maxListings": max_listings,
-        "includeReviews": False,  # Don't need reviews for pricing
-        "calendarMonths": 3,  # Get 3 months of calendar data
+        "listingUrls": competitor_urls,
         "currency": "GBP",
         "proxyConfiguration": {"useApifyProxy": True},
     }
 
-    print(f"Starting Apify scraper with {len(search_urls)} search URLs...")
-    run = client.actor("dtrungtin/airbnb-scraper").call(run_input=run_input)
+    try:
+        # Use the full-year price tracker
+        run = client.actor("simpleapi/airbnb-full-year-price-tracker-scraper").call(
+            run_input=run_input
+        )
 
-    # Fetch results
-    items = list(client.dataset(run["defaultDatasetId"]).iterate_items())
-    print(f"Scraped {len(items)} listings from Airbnb")
+        # Fetch results
+        items = list(client.dataset(run["defaultDatasetId"]).iterate_items())
+        print(f"Scraped calendar data for {len(items)} listings")
+        return items
 
-    return items
+    except Exception as e:
+        print(f"Calendar scraper failed: {e}")
+        print("Falling back to alternative scraper...")
+
+        # Fallback: Use room scraper with calendar data
+        # This scraper provides detailed listing info including pricing calendars
+        run_input_alt = {
+            "startUrls": [{"url": url} for url in competitor_urls],
+            "includeReviews": False,
+            "currency": "GBP",
+            "maxListings": len(competitor_urls),
+            "proxyConfiguration": {"useApifyProxy": True},
+        }
+
+        run = client.actor("tri_angle/airbnb-rooms-urls-scraper").call(
+            run_input=run_input_alt
+        )
+
+        items = list(client.dataset(run["defaultDatasetId"]).iterate_items())
+        print(f"Fallback scraper: Got {len(items)} listings")
+        return items
 
 
-def store_raw_data(items: List[Dict], bucket_name: str):
-    """Store raw JSON to Cloud Storage for backup."""
-    storage_client = storage.Client()
-    bucket = storage_client.bucket(bucket_name)
+def normalize_calendar_data(listing: Dict, scrape_date: date) -> Dict:
+    """
+    Normalize calendar scraper output to our schema.
 
-    timestamp = datetime.now().isoformat()
-    blob_name = f"raw/airbnb/{timestamp}.json"
-    blob = bucket.blob(blob_name)
+    The calendar scraper provides daily pricing data - we need to extract:
+    - Listing metadata (id, name, location, etc.)
+    - Calendar array with dates and prices
+    """
+    # Extract listing ID from URL or id field
+    listing_id = str(listing.get("id") or listing.get("listingId", "unknown"))
 
-    blob.upload_from_string(
-        json.dumps(items, indent=2),
-        content_type="application/json"
-    )
-
-    print(f"Stored raw data to gs://{bucket_name}/{blob_name}")
-
-
-def normalize_listing(listing: Dict) -> Dict:
-    """Normalize Airbnb listing data to our schema."""
-    return {
-        "listing_id": str(listing.get("id")),
+    # Basic listing info
+    normalized = {
+        "listing_id": listing_id,
         "source": "airbnb",
-        "name": listing.get("name"),
+        "name": listing.get("name") or listing.get("title"),
         "url": listing.get("url"),
-        "property_type": listing.get("propertyType"),
+        "property_type": listing.get("propertyType") or listing.get("roomType"),
         "room_type": listing.get("roomType"),
-        "bedrooms": listing.get("beds") or listing.get("bedrooms"),
+        "bedrooms": listing.get("bedrooms"),
         "bathrooms": listing.get("bathrooms"),
-        "max_guests": listing.get("maxGuests"),
-        "latitude": listing.get("coordinates", {}).get("latitude"),
-        "longitude": listing.get("coordinates", {}).get("longitude"),
-        "rating": listing.get("rating"),
-        "review_count": listing.get("reviewsCount"),
+        "max_guests": listing.get("maxGuests") or listing.get("personCapacity"),
+        "latitude": listing.get("lat") or (listing.get("coordinates", {}).get("latitude") if listing.get("coordinates") else None),
+        "longitude": listing.get("lng") or (listing.get("coordinates", {}).get("longitude") if listing.get("coordinates") else None),
+        "rating": listing.get("rating") or (listing.get("rating", {}).get("guestSatisfaction") if isinstance(listing.get("rating"), dict) else None),
+        "review_count": listing.get("reviewsCount") or listing.get("numberOfReviews"),
         "amenities": listing.get("amenities", []),
-        "host_is_superhost": (listing.get("host") or {}).get("isSuperhost", False),
+        "host_is_superhost": (listing.get("host") or {}).get("isSuperhost", False) if listing.get("host") else False,
         "instant_bookable": listing.get("instantBookable", False),
-        "first_seen_date": date.today().isoformat(),
-        "last_seen_date": date.today().isoformat(),
+        "first_seen_date": scrape_date.isoformat(),
+        "last_seen_date": scrape_date.isoformat(),
         "is_active": True,
+        "calendar": listing.get("calendar") or listing.get("priceCalendar", [])
     }
 
+    return normalized
 
-def extract_calendar_prices(listing: Dict, scrape_date: date) -> List[Dict]:
-    """Extract daily pricing from listing calendar data."""
+
+def extract_daily_prices_from_calendar(listing: Dict, scrape_date: date) -> List[Dict]:
+    """
+    Extract daily pricing from calendar data.
+
+    Calendar structure varies by scraper:
+    - Full-year tracker: [{date, price, available}, ...]
+    - Room scraper: {months: [{days: [{date, price, available}]}]}
+    """
     prices = []
-    calendar = listing.get("calendar", {})
+    listing_id = str(listing.get("listing_id") or listing.get("id"))
 
-    # Calendar structure: {months: [{days: [{date, price, available}]}]}
-    for month in calendar.get("months", []):
-        for day in month.get("days", []):
+    calendar = listing.get("calendar") or listing.get("priceCalendar", [])
+
+    # Handle array format (full-year tracker)
+    if isinstance(calendar, list):
+        for day in calendar:
             if day.get("date"):
                 prices.append({
                     "scrape_date": scrape_date.isoformat(),
-                    "listing_id": str(listing.get("id")),
+                    "listing_id": listing_id,
                     "check_in_date": day["date"],
-                    "price_per_night": day.get("price", {}).get("amount"),
-                    "is_available": day.get("available", False),
-                    "min_nights": listing.get("minNights"),
-                    "currency": day.get("price", {}).get("currency", "GBP"),
-                    "nights": 1,  # Single night price
+                    "price_per_night": parse_price(day.get("price")),
                     "cleaning_fee": None,  # Not in calendar data
                     "service_fee": None,
+                    "total_price": parse_price(day.get("price")),
+                    "nights": 1,
+                    "is_available": day.get("available", True),
+                    "min_nights": day.get("minNights"),
+                    "currency": "GBP",
                 })
+
+    # Handle nested format (room scraper)
+    elif isinstance(calendar, dict):
+        months = calendar.get("months", [])
+        for month in months:
+            for day in month.get("days", []):
+                if day.get("date"):
+                    prices.append({
+                        "scrape_date": scrape_date.isoformat(),
+                        "listing_id": listing_id,
+                        "check_in_date": day["date"],
+                        "price_per_night": parse_price(day.get("price")),
+                        "cleaning_fee": None,
+                        "service_fee": None,
+                        "total_price": parse_price(day.get("price")),
+                        "nights": 1,
+                        "is_available": day.get("available", True),
+                        "min_nights": day.get("minNights"),
+                        "currency": "GBP",
+                    })
 
     return prices
 
 
-def load_to_bigquery(listings: List[Dict], prices: List[Dict], project_id: str):
-    """Load normalized data to BigQuery."""
+def parse_price(price_str):
+    """Extract numeric price from string like '£150' or '$200.00'."""
+    if not price_str:
+        return None
+    if isinstance(price_str, (int, float)):
+        return float(price_str)
+
+    # Remove currency symbols and commas
+    import re
+    cleaned = re.sub(r'[£$,]', '', str(price_str))
+    try:
+        return float(cleaned)
+    except ValueError:
+        return None
+
+
+def store_raw_data(data: List[Dict], bucket_name: str, scrape_date: date):
+    """Store raw scraper output to Cloud Storage."""
+    storage_client = storage.Client()
+    bucket = storage_client.bucket(bucket_name)
+
+    filename = f"raw/airbnb/{scrape_date.isoformat()}T{datetime.now().strftime('%H:%M:%S')}.json"
+    blob = bucket.blob(filename)
+    blob.upload_from_string(json.dumps(data, indent=2), content_type="application/json")
+
+    print(f"Stored raw data to gs://{bucket_name}/{filename}")
+
+
+def load_to_bigquery(
+    listings: List[Dict],
+    prices: List[Dict],
+    project_id: str,
+    dataset_id: str = "pricing",
+):
+    """Load listings and pricing data to BigQuery."""
     client = bigquery.Client(project=project_id)
 
-    # Load listings (upsert logic)
+    # Load competitor listings (upsert logic - update if exists)
     if listings:
-        # For MVP, we'll just append and handle duplicates in queries
-        # In production, use MERGE statement
-        table_id = f"{project_id}.pricing.competitor_listings"
-
+        listings_table = f"{project_id}.{dataset_id}.competitor_listings"
         job_config = bigquery.LoadJobConfig(
             write_disposition=bigquery.WriteDisposition.WRITE_APPEND,
-            schema_update_options=[
-                bigquery.SchemaUpdateOption.ALLOW_FIELD_ADDITION
-            ],
+            schema_update_options=[bigquery.SchemaUpdateOption.ALLOW_FIELD_ADDITION],
         )
 
         job = client.load_table_from_json(
-            listings, table_id, job_config=job_config
+            listings, listings_table, job_config=job_config
         )
         job.result()
-        print(f"Loaded {len(listings)} listings to {table_id}")
+        print(f"Loaded {len(listings)} listings to {listings_table}")
 
     # Load daily prices
     if prices:
-        table_id = f"{project_id}.pricing.daily_prices"
-
+        prices_table = f"{project_id}.{dataset_id}.daily_prices"
         job_config = bigquery.LoadJobConfig(
             write_disposition=bigquery.WriteDisposition.WRITE_APPEND,
         )
 
-        job = client.load_table_from_json(
-            prices, table_id, job_config=job_config
-        )
+        job = client.load_table_from_json(prices, prices_table, job_config=job_config)
         job.result()
-        print(f"Loaded {len(prices)} price records to {table_id}")
+        print(f"Loaded {len(prices)} price records to {prices_table}")
 
 
 @functions_framework.http
 def trigger_scrape(request):
     """
-    Main entry point for Cloud Function.
-    Triggered by Cloud Scheduler daily.
+    HTTP Cloud Function entry point for scraping competitor pricing.
     """
     try:
-        # Load configuration
-        config = load_config()
+        scrape_date = date.today()
         project_id = os.getenv("GCP_PROJECT")
-        bucket_name = f"{project_id}-pricing-raw-data"
+
+        # Load competitor listings from config
+        competitors = load_competitors_config()
+
+        if not competitors:
+            return {
+                "error": "No competitors configured. Upload competitors.yaml to Cloud Storage.",
+                "instructions": "Create config/competitors.yaml in gs://{project}-pricing-raw-data bucket"
+            }, 400
+
+        # Extract URLs
+        competitor_urls = [c.get("url") for c in competitors if c.get("url")]
+
+        if not competitor_urls:
+            return {"error": "No valid competitor URLs found in config"}, 400
+
+        print(f"Scraping {len(competitor_urls)} competitor listings...")
 
         # Get Apify token
         apify_token = get_apify_token()
 
-        # Build search URLs
-        search_urls = build_airbnb_search_urls(config)
-        print(f"Built {len(search_urls)} search URLs")
-
-        # Scrape Airbnb
-        raw_listings = scrape_airbnb_data(apify_token, search_urls)
-
-        if not raw_listings:
-            return {"status": "warning", "message": "No listings scraped"}, 200
+        # Scrape calendar data
+        raw_listings = scrape_calendar_data(apify_token, competitor_urls)
 
         # Store raw data
-        store_raw_data(raw_listings, bucket_name)
+        bucket_name = f"{project_id}-pricing-raw-data"
+        store_raw_data(raw_listings, bucket_name, scrape_date)
 
-        # Normalize listings
-        normalized_listings = [normalize_listing(l) for l in raw_listings]
+        # Normalize data
+        normalized_listings = [
+            normalize_calendar_data(l, scrape_date) for l in raw_listings
+        ]
 
-        # Extract pricing data
+        # Extract daily prices from calendar
         all_prices = []
-        scrape_date = date.today()
-        for listing in raw_listings:
-            prices = extract_calendar_prices(listing, scrape_date)
+        for listing in normalized_listings:
+            prices = extract_daily_prices_from_calendar(listing, scrape_date)
             all_prices.extend(prices)
 
         # Load to BigQuery
         load_to_bigquery(normalized_listings, all_prices, project_id)
 
-        # Trigger analyzer function (will be implemented in Phase 2)
-        # For now, analyzer will run on its own schedule
-
         return {
             "status": "success",
+            "scrape_date": scrape_date.isoformat(),
             "listings_scraped": len(normalized_listings),
             "price_records": len(all_prices),
-            "scrape_date": scrape_date.isoformat(),
-        }, 200
+            "competitors_configured": len(competitors),
+        }
 
     except Exception as e:
-        print(f"Error in scraper: {str(e)}")
+        print(f"Error in scraper: {e}")
         import traceback
         traceback.print_exc()
-        return {"status": "error", "message": str(e)}, 500
+        return {"error": str(e)}, 500

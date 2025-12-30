@@ -1,0 +1,25 @@
+# Competitor Airbnb listings for pricing comparison
+# Add your manually-selected comparable properties here
+# These will be scraped for full-year calendar pricing data
+
+competitors:
+  # Example format - replace with your actual comparables
+  # You can find these by searching Airbnb for properties in Bradwell/Peak District
+  # that match your criteria (2BR, sleeps 4-6, similar amenities)
+
+  # - listing_id: "12345678"
+  #   url: "https://www.airbnb.com/rooms/12345678"
+  #   name: "Cozy Peak District Cottage"
+  #   notes: "Similar size, good location"
+
+  # - listing_id: "87654321"
+  #   url: "https://www.airbnb.com/rooms/87654321"
+  #   name: "Stone Cottage with Views"
+  #   notes: "Slightly larger but comparable pricing"
+
+# Add 10-15 competitors here
+# Focus on properties that:
+# - Sleep 4-6 guests (similar to your 6-guest capacity)
+# - Located within 3-5km of Bradwell
+# - Similar property type (entire cottage/home)
+# - Have active bookings and good reviews
