@@ -116,12 +116,20 @@ POOL_FULL_NAME=$(gcloud iam workload-identity-pools describe $POOL_NAME \
     --location=global \
     --format="value(name)")
 
-# Create OIDC provider
+# Get GitHub repo first (needed for attribute condition)
+read -p "Enter your GitHub repository owner (e.g., arcinsights): " GITHUB_OWNER
+if [ -z "$GITHUB_OWNER" ]; then
+    echo "❌ GitHub repository owner cannot be empty"
+    exit 1
+fi
+
+# Create OIDC provider with attribute condition
 gcloud iam workload-identity-pools providers create-oidc $PROVIDER_NAME \
     --location="global" \
     --workload-identity-pool="$POOL_NAME" \
     --display-name="GitHub provider" \
     --attribute-mapping="google.subject=assertion.sub,attribute.actor=assertion.actor,attribute.repository=assertion.repository" \
+    --attribute-condition="assertion.repository_owner == '${GITHUB_OWNER}'" \
     --issuer-uri="https://token.actions.githubusercontent.com" \
     2>/dev/null || echo "  Provider already exists"
 
@@ -142,12 +150,14 @@ fi
 
 echo "✅ Workload Identity Federation configured"
 
-# Get GitHub repo
-read -p "Enter your GitHub repository (format: username/repo): " GITHUB_REPO
-if [ -z "$GITHUB_REPO" ]; then
-    echo "❌ GitHub repository cannot be empty"
+# Get GitHub repo name
+read -p "Enter your GitHub repository name (e.g., northcliffe-pricing-claude): " GITHUB_REPO_NAME
+if [ -z "$GITHUB_REPO_NAME" ]; then
+    echo "❌ GitHub repository name cannot be empty"
     exit 1
 fi
+
+GITHUB_REPO="${GITHUB_OWNER}/${GITHUB_REPO_NAME}"
 
 # Grant GitHub Actions permission to impersonate service account
 echo ""
