@@ -1,6 +1,8 @@
 """
 Cloud Function to analyze competitor data and generate price recommendations.
 Triggered after scraper completes or on its own schedule.
+
+This function calculates pricing recommendations based on competitor data.
 """
 
 import functions_framework
