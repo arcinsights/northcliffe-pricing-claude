@@ -356,3 +356,4 @@ def trigger_scrape(request):
         import traceback
         traceback.print_exc()
         return {"error": str(e)}, 500
+
