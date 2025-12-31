@@ -202,9 +202,9 @@ def run_analysis(request):
 
         comp_set_ids = [c["listing_id"] for c in comp_set]
 
-        # Get events for next 90 days
+        # Get events for next 365 days
         start_date = date.today()
-        end_date = start_date + timedelta(days=90)
+        end_date = start_date + timedelta(days=365)
         events = get_events(project_id, start_date, end_date)
         print(f"Loaded {len(events)} events")
 
@@ -212,7 +212,7 @@ def run_analysis(request):
         recommendations = []
         recommendation_date = date.today()
 
-        for day_offset in range(1, 91):  # Next 90 days
+        for day_offset in range(1, 366):  # Next 365 days (full year)
             target_date = date.today() + timedelta(days=day_offset)
 
             # Get competitor prices for this date

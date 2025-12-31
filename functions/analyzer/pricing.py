@@ -72,7 +72,9 @@ def calculate_similarity_score(listing: Dict, target_property: Dict) -> float:
     score = 0.0
 
     # Bedroom match (30 points max)
-    bedroom_diff = abs(listing.get('bedrooms', 0) - target_property.get('bedrooms', 0))
+    listing_bedrooms = listing.get('bedrooms') or 0
+    target_bedrooms = target_property.get('bedrooms') or 0
+    bedroom_diff = abs(listing_bedrooms - target_bedrooms)
     if bedroom_diff == 0:
         score += 30
     elif bedroom_diff == 1:
@@ -81,7 +83,9 @@ def calculate_similarity_score(listing: Dict, target_property: Dict) -> float:
         score += 5
 
     # Bathroom match (15 points max)
-    bathroom_diff = abs(listing.get('bathrooms', 0) - target_property.get('bathrooms', 0))
+    listing_bathrooms = listing.get('bathrooms') or 0
+    target_bathrooms = target_property.get('bathrooms') or 0
+    bathroom_diff = abs(listing_bathrooms - target_bathrooms)
     if bathroom_diff <= 0.5:
         score += 15
     elif bathroom_diff <= 1:
@@ -119,8 +123,8 @@ def calculate_similarity_score(listing: Dict, target_property: Dict) -> float:
         score += 4
 
     # Amenity overlap (10 points max)
-    listing_amenities = set(listing.get('amenities', []))
-    target_amenities = set(target_property.get('amenities', []))
+    listing_amenities = set(listing.get('amenities') or [])
+    target_amenities = set(target_property.get('amenities') or [])
     if listing_amenities and target_amenities:
         key_amenities = {'Wifi', 'Kitchen', 'Washer', 'Free parking', 'Air conditioning'}
         common = listing_amenities & target_amenities
@@ -312,3 +316,121 @@ def generate_recommendation(
         factors=factor_dicts,
         confidence=confidence
     )
+
+
+def interpolate_price(
+    target_date: date,
+    known_recommendations: List[PriceRecommendation],
+    events: List[Dict],
+    amenity_premium: float = 0,
+) -> Optional[PriceRecommendation]:
+    """
+    Generate price for a date without competitor data by interpolating
+    between known dates using seasonality and other factors.
+    """
+    if not known_recommendations:
+        return None
+
+    # Find nearest dates with data (before and after)
+    before = [r for r in known_recommendations if date.fromisoformat(r.target_date) < target_date]
+    after = [r for r in known_recommendations if date.fromisoformat(r.target_date) > target_date]
+
+    # Get base price from nearest date or average if equidistant
+    if before and after:
+        nearest_before = max(before, key=lambda r: date.fromisoformat(r.target_date))
+        nearest_after = min(after, key=lambda r: date.fromisoformat(r.target_date))
+        base_price = (nearest_before.recommended_price + nearest_after.recommended_price) / 2
+    elif before:
+        base_price = max(before, key=lambda r: date.fromisoformat(r.target_date)).recommended_price
+    elif after:
+        base_price = min(after, key=lambda r: date.fromisoformat(r.target_date)).recommended_price
+    else:
+        # Fallback: use average of all known prices
+        base_price = statistics.mean([r.recommended_price for r in known_recommendations])
+
+    # Apply factors for this specific date
+    days_until = (target_date - date.today()).days
+    factors = [
+        get_seasonality_factor(target_date),
+        get_day_of_week_factor(target_date),
+        get_lead_time_factor(days_until),
+        get_event_factor(target_date, events),
+    ]
+
+    # Apply multipliers
+    total_multiplier = 1.0
+    for factor in factors:
+        total_multiplier *= factor.multiplier
+
+    recommended = round(base_price * total_multiplier, 0)
+
+    # Calculate range
+    min_price = round(recommended * 0.85, 0)
+    max_price = round(recommended * 1.15, 0)
+
+    # Interpolated prices have lower confidence
+    confidence = "low"
+
+    # Convert factors to dicts
+    factor_dicts = [asdict(f) for f in factors]
+
+    return PriceRecommendation(
+        target_date=target_date.isoformat(),
+        recommended_price=recommended,
+        min_price=min_price,
+        max_price=max_price,
+        comp_set_median=None,  # No actual comp data for interpolated dates
+        comp_set_min=None,
+        comp_set_max=None,
+        comp_set_count=0,  # 0 indicates interpolated
+        factors=factor_dicts,
+        confidence=confidence
+    )
+
+
+def apply_length_of_stay_discount(
+    nightly_price: float,
+    num_nights: int,
+    discount_tiers: Optional[Dict[int, float]] = None
+) -> Dict:
+    """
+    Apply length-of-stay discounts to encourage longer bookings.
+
+    Args:
+        nightly_price: Base nightly rate
+        num_nights: Number of nights in stay
+        discount_tiers: Custom discount tiers {nights: discount_percent}
+                       Defaults to {3: 5, 7: 10, 14: 15}
+
+    Returns:
+        Dict with total_price, discount_percent, discount_amount, effective_nightly_rate
+    """
+    if discount_tiers is None:
+        discount_tiers = {
+            3: 5,   # 5% off for 3+ nights
+            7: 10,  # 10% off for 7+ nights
+            14: 15, # 15% off for 14+ nights
+        }
+
+    # Find applicable discount (highest tier that applies)
+    discount_percent = 0
+    for nights_threshold, discount in sorted(discount_tiers.items(), reverse=True):
+        if num_nights >= nights_threshold:
+            discount_percent = discount
+            break
+
+    # Calculate totals
+    base_total = nightly_price * num_nights
+    discount_amount = base_total * (discount_percent / 100)
+    total_price = base_total - discount_amount
+    effective_nightly_rate = total_price / num_nights if num_nights > 0 else total_price
+
+    return {
+        "num_nights": num_nights,
+        "nightly_rate": nightly_price,
+        "base_total": round(base_total, 2),
+        "discount_percent": discount_percent,
+        "discount_amount": round(discount_amount, 2),
+        "total_price": round(total_price, 2),
+        "effective_nightly_rate": round(effective_nightly_rate, 2),
+    }

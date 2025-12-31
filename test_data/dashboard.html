@@ -1,0 +1,393 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Northcliffe Pricing Dashboard</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f5f5f7;
+            padding: 20px;
+        }
+        .container { max-width: 1400px; margin: 0 auto; }
+        h1 { color: #1d1d1f; margin-bottom: 10px; font-size: 32px; }
+        .subtitle { color: #86868b; margin-bottom: 30px; }
+        .cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 24px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+        }
+        .card h3 { color: #86868b; font-size: 14px; font-weight: 500; margin-bottom: 8px; }
+        .card .value { color: #1d1d1f; font-size: 36px; font-weight: 600; }
+        .card .subvalue { color: #86868b; font-size: 14px; margin-top: 4px; }
+        .chart-container {
+            background: white;
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+        }
+        .chart-container h2 { color: #1d1d1f; font-size: 20px; margin-bottom: 20px; }
+        canvas { max-height: 400px; }
+        .recommendations {
+            background: white;
+            border-radius: 12px;
+            padding: 24px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th {
+            text-align: left;
+            color: #86868b;
+            font-size: 12px;
+            font-weight: 500;
+            padding: 12px 16px;
+            border-bottom: 1px solid #f5f5f7;
+        }
+        td {
+            padding: 16px;
+            border-bottom: 1px solid #f5f5f7;
+            color: #1d1d1f;
+        }
+        tr:hover { background: #fafafa; }
+        .price { font-weight: 600; color: #0071e3; }
+        .confidence-high { color: #34c759; }
+        .confidence-medium { color: #ff9500; }
+        .confidence-low { color: #ff3b30; }
+        .badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 500;
+        }
+        .badge-high { background: #d1f4e0; color: #157347; }
+        .badge-medium { background: #fff3cd; color: #997404; }
+        .badge-low { background: #f8d7da; color: #842029; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Pricing Dashboard</h1>
+        <p class="subtitle">Competitor analysis & pricing recommendations · Updated December 31, 2025</p>
+
+        <div class="cards">
+            <div class="card">
+                <h3>COMPETITORS TRACKED</h3>
+                <div class="value">11</div>
+                <div class="subvalue">Active listings</div>
+            </div>
+            <div class="card">
+                <h3>MARKET MEDIAN</h3>
+                <div class="value">£205</div>
+                <div class="subvalue">Per night</div>
+            </div>
+            <div class="card">
+                <h3>PRICE RANGE</h3>
+                <div class="value">£118-508</div>
+                <div class="subvalue">Competitor range</div>
+            </div>
+            <div class="card">
+                <h3>RECOMMENDATIONS</h3>
+                <div class="value">17</div>
+                <div class="subvalue">Next 90 days</div>
+            </div>
+        </div>
+
+        <div class="chart-container">
+            <h2>Price Recommendations vs Market</h2>
+            <canvas id="priceChart"></canvas>
+        </div>
+
+        <div class="recommendations">
+            <h2 style="margin-bottom: 20px;">Upcoming Recommendations</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>DATE</th>
+                        <th>RECOMMENDED PRICE</th>
+                        <th>MARKET MEDIAN</th>
+                        <th>MARKET RANGE</th>
+                        <th>COMP SET</th>
+                        <th>CONFIDENCE</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    
+                    <tr>
+                        <td>2026-01-15</td>
+                        <td class="price">£194</td>
+                        <td>£240</td>
+                        <td>£165-£223</td>
+                        <td>3 listings</td>
+                        <td>
+                            <span class="badge badge-low">LOW</span>
+                        </td>
+                    </tr>
+                    
+                    <tr>
+                        <td>2026-01-19</td>
+                        <td class="price">£113</td>
+                        <td>£140</td>
+                        <td>£96-£130</td>
+                        <td>12 listings</td>
+                        <td>
+                            <span class="badge badge-high">HIGH</span>
+                        </td>
+                    </tr>
+                    
+                    <tr>
+                        <td>2026-02-02</td>
+                        <td class="price">£132</td>
+                        <td>£164</td>
+                        <td>£112-£152</td>
+                        <td>1 listings</td>
+                        <td>
+                            <span class="badge badge-low">LOW</span>
+                        </td>
+                    </tr>
+                    
+                    <tr>
+                        <td>2026-02-09</td>
+                        <td class="price">£142</td>
+                        <td>£176</td>
+                        <td>£121-£163</td>
+                        <td>1 listings</td>
+                        <td>
+                            <span class="badge badge-low">LOW</span>
+                        </td>
+                    </tr>
+                    
+                    <tr>
+                        <td>2026-02-14</td>
+                        <td class="price">£233</td>
+                        <td>£240</td>
+                        <td>£198-£268</td>
+                        <td>3 listings</td>
+                        <td>
+                            <span class="badge badge-low">LOW</span>
+                        </td>
+                    </tr>
+                    
+                    <tr>
+                        <td>2026-03-16</td>
+                        <td class="price">£217</td>
+                        <td>£240</td>
+                        <td>£184-£250</td>
+                        <td>3 listings</td>
+                        <td>
+                            <span class="badge badge-low">LOW</span>
+                        </td>
+                    </tr>
+                    
+                    <tr>
+                        <td>2026-04-03</td>
+                        <td class="price">£225</td>
+                        <td>£207</td>
+                        <td>£191-£259</td>
+                        <td>10 listings</td>
+                        <td>
+                            <span class="badge badge-high">HIGH</span>
+                        </td>
+                    </tr>
+                    
+                    <tr>
+                        <td>2026-04-06</td>
+                        <td class="price">£207</td>
+                        <td>£218</td>
+                        <td>£176-£238</td>
+                        <td>2 listings</td>
+                        <td>
+                            <span class="badge badge-low">LOW</span>
+                        </td>
+                    </tr>
+                    
+                    <tr>
+                        <td>2026-04-15</td>
+                        <td class="price">£227</td>
+                        <td>£240</td>
+                        <td>£193-£261</td>
+                        <td>3 listings</td>
+                        <td>
+                            <span class="badge badge-low">LOW</span>
+                        </td>
+                    </tr>
+                    
+                    <tr>
+                        <td>2026-05-15</td>
+                        <td class="price">£274</td>
+                        <td>£240</td>
+                        <td>£233-£315</td>
+                        <td>3 listings</td>
+                        <td>
+                            <span class="badge badge-low">LOW</span>
+                        </td>
+                    </tr>
+                    
+                    <tr>
+                        <td>2026-05-22</td>
+                        <td class="price">£276</td>
+                        <td>£242</td>
+                        <td>£235-£317</td>
+                        <td>8 listings</td>
+                        <td>
+                            <span class="badge badge-medium">MEDIUM</span>
+                        </td>
+                    </tr>
+                    
+                    <tr>
+                        <td>2026-06-14</td>
+                        <td class="price">£237</td>
+                        <td>£240</td>
+                        <td>£201-£273</td>
+                        <td>3 listings</td>
+                        <td>
+                            <span class="badge badge-low">LOW</span>
+                        </td>
+                    </tr>
+                    
+                    <tr>
+                        <td>2026-08-10</td>
+                        <td class="price">£264</td>
+                        <td>£234</td>
+                        <td>£224-£304</td>
+                        <td>13 listings</td>
+                        <td>
+                            <span class="badge badge-high">HIGH</span>
+                        </td>
+                    </tr>
+                    
+                    <tr>
+                        <td>2026-09-18</td>
+                        <td class="price">£219</td>
+                        <td>£201</td>
+                        <td>£186-£252</td>
+                        <td>7 listings</td>
+                        <td>
+                            <span class="badge badge-medium">MEDIUM</span>
+                        </td>
+                    </tr>
+                    
+                    <tr>
+                        <td>2026-10-24</td>
+                        <td class="price">£188</td>
+                        <td>£174</td>
+                        <td>£160-£216</td>
+                        <td>7 listings</td>
+                        <td>
+                            <span class="badge badge-medium">MEDIUM</span>
+                        </td>
+                    </tr>
+                    
+                    <tr>
+                        <td>2026-12-21</td>
+                        <td class="price">£163</td>
+                        <td>£164</td>
+                        <td>£139-£187</td>
+                        <td>7 listings</td>
+                        <td>
+                            <span class="badge badge-medium">MEDIUM</span>
+                        </td>
+                    </tr>
+                    
+                    <tr>
+                        <td>2026-12-23</td>
+                        <td class="price">£179</td>
+                        <td>£180</td>
+                        <td>£152-£206</td>
+                        <td>4 listings</td>
+                        <td>
+                            <span class="badge badge-low">LOW</span>
+                        </td>
+                    </tr>
+                    
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        const priceData = {"dates": ["2026-01-15", "2026-01-19", "2026-02-02", "2026-02-09", "2026-02-14", "2026-03-16", "2026-04-03", "2026-04-06", "2026-04-15", "2026-05-15", "2026-05-22", "2026-06-14", "2026-08-10", "2026-09-18", "2026-10-24", "2026-12-21", "2026-12-23"], "recommended": [194.0, 113.0, 132.0, 142.0, 233.0, 217.0, 225.0, 207.0, 227.0, 274.0, 276.0, 237.0, 264.0, 219.0, 188.0, 163.0, 179.0], "median": [240.0, 140.0, 164.0, 175.66666666666666, 240.0, 240.0, 206.83333333333331, 218.33333333333334, 240.0, 240.0, 241.5, 240.0, 234.0, 200.66666666666666, 173.5, 164.42857142857142, 180.0], "min": [165.0, 96.0, 112.0, 121.0, 198.0, 184.0, 191.0, 176.0, 193.0, 233.0, 235.0, 201.0, 224.0, 186.0, 160.0, 139.0, 152.0], "max": [223.0, 130.0, 152.0, 163.0, 268.0, 250.0, 259.0, 238.0, 261.0, 315.0, 317.0, 273.0, 304.0, 252.0, 216.0, 187.0, 206.0]};
+
+        const ctx = document.getElementById('priceChart').getContext('2d');
+        new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: priceData.dates,
+                datasets: [
+                    {
+                        label: 'Recommended Price',
+                        data: priceData.recommended,
+                        borderColor: '#0071e3',
+                        backgroundColor: 'rgba(0, 113, 227, 0.1)',
+                        borderWidth: 3,
+                        fill: true,
+                        tension: 0.4
+                    },
+                    {
+                        label: 'Market Median',
+                        data: priceData.median,
+                        borderColor: '#86868b',
+                        borderWidth: 2,
+                        borderDash: [5, 5],
+                        fill: false,
+                        tension: 0.4
+                    },
+                    {
+                        label: 'Market Min',
+                        data: priceData.min,
+                        borderColor: '#ff3b30',
+                        borderWidth: 1,
+                        borderDash: [2, 2],
+                        fill: false,
+                        pointRadius: 0
+                    },
+                    {
+                        label: 'Market Max',
+                        data: priceData.max,
+                        borderColor: '#34c759',
+                        borderWidth: 1,
+                        borderDash: [2, 2],
+                        fill: false,
+                        pointRadius: 0
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                plugins: {
+                    legend: {
+                        display: true,
+                        position: 'bottom'
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: false,
+                        ticks: {
+                            callback: function(value) {
+                                return '£' + value;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    </script>
+</body>
+</html>
