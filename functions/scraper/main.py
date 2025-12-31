@@ -247,9 +247,18 @@ def load_to_bigquery(
         # Ensure listing_id is always a string
         listings = ensure_string_fields(listings, ["listing_id"])
 
+        # Debug: Print first listing to verify types
+        if listings:
+            print(f"DEBUG: First listing listing_id type: {type(listings[0].get('listing_id'))}, value: {listings[0].get('listing_id')}")
+
         listings_table = f"{project_id}.{dataset_id}.competitor_listings"
+
+        # Get the table's schema to prevent auto-detection issues
+        table = client.get_table(listings_table)
+
         job_config = bigquery.LoadJobConfig(
             write_disposition=bigquery.WriteDisposition.WRITE_APPEND,
+            schema=table.schema,  # Use explicit schema
             schema_update_options=[bigquery.SchemaUpdateOption.ALLOW_FIELD_ADDITION],
         )
 
@@ -265,8 +274,13 @@ def load_to_bigquery(
         prices = ensure_string_fields(prices, ["listing_id"])
 
         prices_table = f"{project_id}.{dataset_id}.daily_prices"
+
+        # Get the table's schema to prevent auto-detection issues
+        table = client.get_table(prices_table)
+
         job_config = bigquery.LoadJobConfig(
             write_disposition=bigquery.WriteDisposition.WRITE_APPEND,
+            schema=table.schema,  # Use explicit schema
         )
 
         job = client.load_table_from_json(prices, prices_table, job_config=job_config)
