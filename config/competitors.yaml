@@ -17,6 +17,61 @@ competitors:
   #   name: "Stone Cottage with Views"
   #   notes: "Slightly larger but comparable pricing"
 
+  - listing_id: "769491896844949884"
+    url: "https://www.airbnb.co.uk/rooms/769491896844949884"
+    name: "Stunningly stylish cottage"
+    notes: "Stylish but small, pro photos"
+
+  - listing_id: "27303065"
+    url: "https://www.airbnb.co.uk/rooms/27303065"
+    name: "Stylish Peak District holiday let cottage"
+    notes: "Much smaller than ours, they have some bookings for the summer"
+
+  - listing_id: "666713250735128129"
+    url: "https://www.airbnb.co.uk/rooms/666713250735128129"
+    name: "Unique & stylish converted Chapel - Peak District"
+    notes: "The best in Bradwell, Heather Chapel. This is our true competition. They have 3 night min rule. for April bank holiday weekend their charges are around 400 per night. all summer nights are 400 per night"
+
+  - listing_id: "1523333617299626264"
+    url: "https://www.airbnb.co.uk/rooms/27303065"
+    name: "Peaceful Retreat in Hope Valley, Peak District"
+    notes: "Very avg decor. charging min 170, min 3 nights always and 5 nights during holidays with 240 per night"
+
+  - listing_id: "10248357"
+    url: "https://www.airbnb.co.uk/rooms/10248357"
+    name: "Castleton Stunning Peak Cavern Gorge Location"
+    notes: "Much smaller than ours, very established in Castleton. Charging more than us"
+
+  - listing_id: "51677503"
+    url: "https://www.airbnb.co.uk/rooms/51677503"
+    name: "Sleeps 4 immaculate cottage near Castleton & Edale"
+    notes: "slightly smaller, but modern build and decor. charging higher, summer prices are 240 pn and 3 night min"
+
+  - listing_id: "34573106"
+    url: "https://www.airbnb.co.uk/rooms/34573106"
+    name: "Bradwell Derbyshire Peak District Cottage ❤️ Dogs"
+    notes: "Pro photos, highlighting the per friendlyness. booked up heavily for the summer, but they dont have smart pricing, only 3 might min on some weeks"
+
+  - listing_id: "36221807"
+    url: "https://www.airbnb.co.uk/rooms/36221807"
+    name: "Happy Feet Cottage, Sleeps 6"
+    notes: "Bigger in size, but our location is better. they didnt open up after June. 3 minght min on most weeks, 300 per night on busy weeks"
+
+  - listing_id: "592668802244780107"
+    url: "https://www.airbnb.co.uk/rooms/592668802244780107"
+    name: "Columbine Barn Bradwell Hope Valley Peak District"
+    notes: "its afarm house tyle middle of nowhere place, very basic decor and bunk beds. charging a lot higher than expected."
+
+  - listing_id: "930826141684315288"
+    url: "https://www.airbnb.co.uk/rooms/930826141684315288"
+    name: "Brookside Barn"
+    notes: "Similar size, rates are quite high. min 3 nights. but not many reviews"
+
+  - listing_id: "1082375796939549018"
+    url: "https://www.airbnb.co.uk/rooms/1082375796939549018"
+    name: "3 Bed in Hope Valley (oc-92896)"
+    notes: "Bigger than ours, very new construction, managed by holodaycottages.co.uk. very costly, but not many reviews"
+
 # Add 10-15 competitors here
 # Focus on properties that:
 # - Sleep 4-6 guests (similar to your 6-guest capacity)

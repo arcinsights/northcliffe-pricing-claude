@@ -220,6 +220,18 @@ def store_raw_data(data: List[Dict], bucket_name: str, scrape_date: date):
     print(f"Stored raw data to gs://{bucket_name}/{filename}")
 
 
+def ensure_string_fields(data: List[Dict], string_fields: List[str]) -> List[Dict]:
+    """Ensure specified fields are strings, not integers."""
+    result = []
+    for item in data:
+        cleaned = item.copy()
+        for field in string_fields:
+            if field in cleaned and cleaned[field] is not None:
+                cleaned[field] = str(cleaned[field])
+        result.append(cleaned)
+    return result
+
+
 def load_to_bigquery(
     listings: List[Dict],
     prices: List[Dict],
@@ -231,6 +243,9 @@ def load_to_bigquery(
 
     # Load competitor listings (upsert logic - update if exists)
     if listings:
+        # Ensure listing_id is always a string
+        listings = ensure_string_fields(listings, ["listing_id"])
+
         listings_table = f"{project_id}.{dataset_id}.competitor_listings"
         job_config = bigquery.LoadJobConfig(
             write_disposition=bigquery.WriteDisposition.WRITE_APPEND,
@@ -245,6 +260,9 @@ def load_to_bigquery(
 
     # Load daily prices
     if prices:
+        # Ensure listing_id is always a string in prices too
+        prices = ensure_string_fields(prices, ["listing_id"])
+
         prices_table = f"{project_id}.{dataset_id}.daily_prices"
         job_config = bigquery.LoadJobConfig(
             write_disposition=bigquery.WriteDisposition.WRITE_APPEND,
