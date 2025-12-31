@@ -112,18 +112,6 @@ def normalize_calendar_data(listing: Dict, scrape_date: date) -> Dict:
     # Extract listing ID from URL or id field
     listing_id = str(listing.get("id") or listing.get("listingId", "unknown"))
 
-    # Flatten amenities from nested structure to simple string list
-    amenities = []
-    raw_amenities = listing.get("amenities", [])
-    if isinstance(raw_amenities, list):
-        for amenity_group in raw_amenities:
-            if isinstance(amenity_group, dict):
-                for value in amenity_group.get("values", []):
-                    if isinstance(value, dict) and value.get("available"):
-                        amenities.append(value.get("title", ""))
-            elif isinstance(amenity_group, str):
-                amenities.append(amenity_group)
-
     # Basic listing info
     normalized = {
         "listing_id": listing_id,
@@ -139,7 +127,6 @@ def normalize_calendar_data(listing: Dict, scrape_date: date) -> Dict:
         "longitude": listing.get("lng") or (listing.get("coordinates", {}).get("longitude") if listing.get("coordinates") else None),
         "rating": listing.get("rating", {}).get("guestSatisfaction") if isinstance(listing.get("rating"), dict) else listing.get("rating"),
         "review_count": listing.get("rating", {}).get("reviewsCount") if isinstance(listing.get("rating"), dict) else listing.get("reviewsCount") or listing.get("numberOfReviews"),
-        "amenities": amenities,
         "host_is_superhost": (listing.get("host") or {}).get("isSuperhost", False) if listing.get("host") else False,
         "instant_bookable": listing.get("instantBookable", False),
         "first_seen_date": scrape_date.isoformat(),
