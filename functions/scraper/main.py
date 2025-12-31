@@ -127,6 +127,7 @@ def normalize_calendar_data(listing: Dict, scrape_date: date) -> Dict:
         "longitude": listing.get("lng") or (listing.get("coordinates", {}).get("longitude") if listing.get("coordinates") else None),
         "rating": listing.get("rating", {}).get("guestSatisfaction") if isinstance(listing.get("rating"), dict) else listing.get("rating"),
         "review_count": listing.get("rating", {}).get("reviewsCount") if isinstance(listing.get("rating"), dict) else listing.get("reviewsCount") or listing.get("numberOfReviews"),
+        "amenities": [],  # Empty array - amenities not needed for pricing
         "host_is_superhost": (listing.get("host") or {}).get("isSuperhost", False) if listing.get("host") else False,
         "instant_bookable": listing.get("instantBookable", False),
         "first_seen_date": scrape_date.isoformat(),
