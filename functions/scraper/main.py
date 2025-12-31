@@ -1,6 +1,7 @@
 """
 Cloud Function to scrape competitor calendar pricing data from Airbnb via Apify.
 Uses manually-specified competitor listings to get full-year pricing data.
+Updated to use new Apify token from Secret Manager.
 """
 
 import functions_framework
