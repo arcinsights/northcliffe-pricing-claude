@@ -265,8 +265,13 @@ def load_to_bigquery(
         job = client.load_table_from_json(
             listings, listings_table, job_config=job_config
         )
-        job.result()
-        print(f"Loaded {len(listings)} listings to {listings_table}")
+        try:
+            job.result()
+            print(f"Loaded {len(listings)} listings to {listings_table}")
+        except Exception as e:
+            if hasattr(job, 'errors') and job.errors:
+                print(f"BigQuery load errors: {job.errors}")
+            raise
 
     # Load daily prices
     if prices:
