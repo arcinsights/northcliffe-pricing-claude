@@ -127,13 +127,11 @@ def normalize_calendar_data(listing: Dict, scrape_date: date) -> Dict:
         "longitude": listing.get("lng") or (listing.get("coordinates", {}).get("longitude") if listing.get("coordinates") else None),
         "rating": listing.get("rating", {}).get("guestSatisfaction") if isinstance(listing.get("rating"), dict) else listing.get("rating"),
         "review_count": listing.get("rating", {}).get("reviewsCount") if isinstance(listing.get("rating"), dict) else listing.get("reviewsCount") or listing.get("numberOfReviews"),
-        "amenities": [],  # Empty array - amenities not needed for pricing
         "host_is_superhost": (listing.get("host") or {}).get("isSuperhost", False) if listing.get("host") else False,
         "instant_bookable": listing.get("instantBookable", False),
         "first_seen_date": scrape_date.isoformat(),
         "last_seen_date": scrape_date.isoformat(),
-        "is_active": True,
-        "calendar": listing.get("calendar") or listing.get("priceCalendar", [])
+        "is_active": True
     }
 
     return normalized
@@ -334,10 +332,13 @@ def trigger_scrape(request):
             normalize_calendar_data(l, scrape_date) for l in raw_listings
         ]
 
-        # Extract daily prices from calendar
+        # Extract daily prices from calendar (use raw listings which have calendar data)
         all_prices = []
-        for listing in normalized_listings:
-            prices = extract_daily_prices_from_calendar(listing, scrape_date)
+        for i, raw_listing in enumerate(raw_listings):
+            # Merge listing_id from normalized version
+            raw_listing_with_id = raw_listing.copy()
+            raw_listing_with_id["listing_id"] = normalized_listings[i]["listing_id"]
+            prices = extract_daily_prices_from_calendar(raw_listing_with_id, scrape_date)
             all_prices.extend(prices)
 
         # Load to BigQuery
